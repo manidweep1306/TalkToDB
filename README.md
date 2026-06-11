@@ -1,20 +1,69 @@
 # TalkToDB
 
-TalkToDB is a lightweight, local-first prototype that demonstrates a safe, deterministic
-pipeline for translating natural-language database questions into executable SQLite queries.
-It was designed to reduce LLM hallucinations via a structured feedback loop and an optional
-feature-flagged remote LLM path for production integration.
+TalkToDB is a local-first Natural Language to SQL demo built with Python, SQLite, and FastAPI.
+It converts plain-English questions into executable SQL, runs the query, and returns results.
 
-Repository: https://github.com/manidweep1306/TalkToDB
+## Project Objectives
 
-Key features
-- Local-first: runs without external LLMs by default using a deterministic SQL generator.
-- Dynamic schema injection: introspects the SQLite database and builds concise schema prompts.
-- Self-healing loop: captures SQL execution errors and retries generation (configurable retries).
-- FastAPI server: `server.py` exposes a POST `/query` endpoint for integration.
-- Tests and CI: unit tests included and a GitHub Actions workflow to run them on push/PR.
+- Provide a simple NL-to-SQL workflow that works out of the box.
+- Keep the default path deterministic and offline-friendly.
+- Support an optional remote LLM integration via feature flags.
+- Expose both API and web UI entry points.
 
-Quick start (create virtualenv, install deps):
+## Features
+
+- SQLite sample database with employee data.
+- Automatic schema introspection for SQL generation context.
+- Retry-based self-healing loop for SQL execution errors.
+- FastAPI service with:
+	- `GET /` simple web UI
+	- `POST /query` question-to-result endpoint
+- Unit tests with GitHub Actions CI.
+- Docker support for containerized runs.
+
+## Tech Stack
+
+- Python
+- FastAPI
+- Pandas
+- SQLite
+- Uvicorn
+- GitHub Actions
+- Docker
+
+## Repository Structure
+
+```text
+.
+|-- app.py
+|-- server.py
+|-- requirements.txt
+|-- Dockerfile
+|-- tests/
+|   |-- __init__.py
+|   `-- test_app.py
+`-- .github/workflows/
+		|-- ci.yml
+		`-- docker-publish.yml
+```
+
+## How It Works
+
+1. A user asks a natural-language question.
+2. The app inspects database schema metadata.
+3. The SQL generator produces a candidate SQLite query.
+4. The query is executed.
+5. On error, the app retries with error-informed regeneration.
+6. On success, rows are returned as text output.
+
+## Setup
+
+### Prerequisites
+
+- Python 3.10+
+- pip
+
+### Installation
 
 ```bash
 python -m venv .venv
@@ -22,71 +71,70 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-Run the CLI agent:
+## Running the Project
 
-```bash
-python app.py
-```
-
-Run the FastAPI server locally:
+### Run FastAPI Server
 
 ```bash
 uvicorn server:app --reload
-# then POST JSON {"question": "Find engineering workers making above 90000"}
-# to http://localhost:8000/query
 ```
 
-Docker
-------
-Build and run the provided Docker image (uses the FastAPI server):
+Open:
+
+- `http://localhost:8000` for the built-in web page
+- `POST http://localhost:8000/query` for API usage
+
+### API Request Example
+
+```bash
+curl -X POST "http://localhost:8000/query" \
+	-H "Content-Type: application/json" \
+	-d "{\"question\":\"Find engineering workers making above 90000\"}"
+```
+
+Sample JSON response shape:
+
+```json
+{
+	"generated_sql": "SELECT * FROM employees WHERE department = 'Engineering' AND salary > 90000;",
+	"query_result": "...",
+	"error_message": null
+}
+```
+
+## Optional Remote LLM Mode
+
+By default, TalkToDB uses a local deterministic SQL generator.
+To enable remote LLM calls, set:
+
+- `TALKTODB_USE_LLM=true`
+- `TALKTODB_MODEL=gemini-2.0-flash`
+- `TALKTODB_TEMP=0`
+
+If the remote LLM package or credentials are unavailable, the app falls back to the local path.
+
+## Docker
+
+Build and run:
 
 ```bash
 docker build -t talktodb:latest .
 docker run -p 8000:8000 talktodb:latest
 ```
 
-Continuous Integration
-----------------------
-A GitHub Actions workflow is included at `.github/workflows/ci.yml` which installs
-dependencies and runs the unit tests on push and pull requests.
+## Testing
 
-Enabling remote LLM (optional)
--------------------------------
-Remote LLM usage is feature-flagged. Set the following environment variables to enable it:
-
-- `TALKTODB_USE_LLM=true` — enable remote LLM path
-- `TALKTODB_MODEL=gemini-2.0-flash` — model name (default in code)
-- `TALKTODB_TEMP=0` — temperature (default 0)
-
-When enabled, the code attempts to import `langchain_google_genai.ChatGoogleGenerativeAI`.
-If that package or credentials are missing, the system gracefully falls back to the local generator.
-
-Pushing this repository to your GitHub
------------------------------------
-To push these changes to your repository `https://github.com/manidweep1306/TalkToDB`, run:
+Run unit tests:
 
 ```bash
-git init
-git add --all
-git commit -m "Add Docker, CI, server, tests, and README"
-git remote add origin https://github.com/manidweep1306/TalkToDB.git
-git branch -M main
-git push -u origin main
+python -m unittest -v
 ```
 
-If your repository already exists and has commits, prefer pulling first or force-pushing only when
-you're sure:
+## CI/CD
 
-```bash
-git pull origin main --rebase
-git push origin main
-```
+- `.github/workflows/ci.yml`: installs dependencies and runs tests on push/PR.
+- `.github/workflows/docker-publish.yml`: builds Docker image and conditionally publishes when DockerHub secrets exist.
 
-Support & Next Steps
---------------------
-- Add production-grade LLM integration with credential handling and rate limiting.
-- Replace the simple loop with a `StateGraph` implementation and persistent logging.
-- Add Docker Compose manifest and a ready-made deployment pipeline (Helm/GKE or ECS).
+## License
 
-If you want, I can create a GitHub Actions workflow that builds and pushes the Docker image to
-GitHub Packages or Docker Hub next.
+No license file is currently included in this repository.
