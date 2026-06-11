@@ -1,3 +1,9 @@
+"""TalkToDB logic layer.
+
+This module contains database utilities and the NL-to-SQL agent loop.
+It is intentionally framework-agnostic so API routing can live in server.py.
+"""
+
 import os
 import re
 import sqlite3
@@ -196,6 +202,20 @@ def run_agent_once(question: str, max_retries: int = 3, conn_override: Optional[
         break
     return {"query_result": None, "error_message": state.get("error_message"), "generated_sql": state.get("generated_sql")}
 
+
+def handle_question(question: str, db_path: Optional[str] = None, max_retries: int = 3) -> Dict[str, Any]:
+    """Public logic-layer entrypoint used by the API server.
+
+    Creates an isolated DB connection, ensures sample data exists, and executes
+    the agent loop for one natural-language question.
+    """
+    local_conn = get_connection(db_path=db_path)
+    try:
+        create_sample_db(local_conn)
+        return run_agent_once(question, max_retries=max_retries, conn_override=local_conn)
+    finally:
+        local_conn.close()
+
 # 3. GRAPH NODES (The Reasoning Engine)
 def generate_sql(state: AgentState):
     """Translates text to SQL, using error logs as feedback loops if present."""
@@ -257,31 +277,3 @@ def route_next_step(state: AgentState) -> str:
         return "retry"
     return "finalize"
 
-# 5. EXECUTION HARNESS
-if __name__ == "__main__":
-    print("Initializing TalkToDB Agent Session...")
-
-    # Intentionally vague phrasing using 'hire day' to test column resolution mapping
-    user_prompt = "Find engineering workers making above 90000, sorted by their hire day."
-
-    state: AgentState = {"question": user_prompt, "retry_count": 0}
-
-    while True:
-        gen = generate_sql(state)
-        state.update(gen)
-
-        exec_res = execute_sql(state)
-        state.update(exec_res)
-
-        step = route_next_step(state)
-        if step == "retry":
-            # loop will regenerate SQL with updated retry_count and any error_message
-            continue
-        if step == "finalize":
-            summary = synthesize_summary(state)
-            print("\n================ FINAL REPORT ================")
-            print(summary["query_result"])
-            break
-        print("Stopping after repeated failures.")
-        print(state.get("error_message"))
-        break

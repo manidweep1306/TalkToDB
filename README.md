@@ -47,6 +47,13 @@ It converts plain-English questions into executable SQL, runs the query, and ret
 		`-- docker-publish.yml
 ```
 
+## Code Organization
+
+- `server.py`: FastAPI entrypoint and HTTP routes (`GET /`, `POST /query`).
+- `app.py`: TalkToDB logic layer (DB setup, schema introspection, NL-to-SQL generation, retry loop).
+
+This keeps web/API routing concerns separate from the core query-agent logic.
+
 ## How It Works
 
 1. A user asks a natural-language question.

@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import uvicorn
-from app import run_agent_once, get_connection, create_sample_db
+from app import handle_question
 
 app = FastAPI()
 
@@ -135,14 +135,9 @@ def home():
         return HOME_PAGE
 
 @app.post('/query')
-async def query(request: Request):
-    # Use a fresh in-memory DB per request for isolation (can be swapped to file DB)
-        payload = await request.json()
-        req = QueryRequest(**payload)
-        conn = get_connection()
-        create_sample_db(conn)
-        result = run_agent_once(req.question, conn_override=conn)
-        return result
+async def query(req: QueryRequest):
+    # API routing lives in server.py; execution logic is delegated to app.py.
+    return handle_question(req.question)
 
 if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0', port=8000)
